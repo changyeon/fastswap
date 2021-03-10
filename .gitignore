@@ -6,5 +6,7 @@
 *.cmd
 *.tmp_versions
 *.pyc
+*.cache
+compile_commands.json
 modules.order
 Module.symvers
