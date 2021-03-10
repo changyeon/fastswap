@@ -210,7 +210,7 @@ static int sswap_rdma_route_resolved(struct rdma_queue *q,
       q->ctrl->rdev->dev->attrs.max_qp_rd_atom,
       q->ctrl->rdev->dev->attrs.max_qp_init_rd_atom);
 
-  ret = rdma_connect(q->cm_id, &param);
+  ret = rdma_connect_locked(q->cm_id, &param);
   if (ret) {
     pr_err("rdma_connect failed (%d)\n", ret);
     sswap_rdma_destroy_queue_ib(q);
@@ -700,7 +700,7 @@ int sswap_rdma_write(struct page *page, u64 roffset)
 
   VM_BUG_ON_PAGE(!PageSwapCache(page), page);
 
-  q = sswap_rdma_get_queue(smp_processor_id(), QP_WRITE_SYNC);
+  q = sswap_rdma_get_queue(smp_processor_id() % numcpus, QP_WRITE_SYNC);
   ret = write_queue_add(q, page, roffset);
   BUG_ON(ret);
   drain_queue(q);
@@ -749,7 +749,7 @@ int sswap_rdma_read_async(struct page *page, u64 roffset)
   VM_BUG_ON_PAGE(!PageLocked(page), page);
   VM_BUG_ON_PAGE(PageUptodate(page), page);
 
-  q = sswap_rdma_get_queue(smp_processor_id(), QP_READ_ASYNC);
+  q = sswap_rdma_get_queue(smp_processor_id() % numcpus, QP_READ_ASYNC);
   ret = begin_read(q, page, roffset);
   return ret;
 }
@@ -764,7 +764,7 @@ int sswap_rdma_read_sync(struct page *page, u64 roffset)
   VM_BUG_ON_PAGE(!PageLocked(page), page);
   VM_BUG_ON_PAGE(PageUptodate(page), page);
 
-  q = sswap_rdma_get_queue(smp_processor_id(), QP_READ_SYNC);
+  q = sswap_rdma_get_queue(smp_processor_id() % numcpus, QP_READ_SYNC);
   ret = begin_read(q, page, roffset);
   return ret;
 }
@@ -816,7 +816,8 @@ static int __init sswap_rdma_init_module(void)
   pr_info("start: %s\n", __FUNCTION__);
   pr_info("* RDMA BACKEND *");
 
-  numcpus = num_online_cpus();
+  /*numcpus = num_online_cpus();*/
+  numcpus = 4;
   numqueues = numcpus * 3;
 
   req_cache = kmem_cache_create("sswap_req_cache", sizeof(struct rdma_req), 0,
